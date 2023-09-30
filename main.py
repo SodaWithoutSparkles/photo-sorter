@@ -8,6 +8,7 @@ import datetime
 from multiprocessing import Pool
 import zipfile
 from pathlib import Path
+import shutil
 
 # optimization
 from operator import itemgetter
@@ -23,7 +24,9 @@ parser.add_argument('-v', '--verbose', action='count',
 parser.add_argument('-t', '--threshold',
                     help='change the threshold to group image, default is 3', default=3, metavar='SECONDS')
 parser.add_argument('-p', '--package', action='store_true',
-                    help="package the sorted photos to zip files")
+                    help="package the sorted photos to folders/directories")
+parser.add_argument('-z', '--zip', action='store_true',
+                    help="zip the packaged files")
 parser.add_argument(
     '-e', '--export', help='path to store result, default to result.txt under the path given', metavar='PATH')
 args = parser.parse_args()
@@ -143,10 +146,36 @@ def sortPhotos(timeList):
 
 
 def packagePhotos(grouped):
-    logger.info('Packaging files...')
     Path(args.path + os.sep + 'packaged').mkdir(parents=True, exist_ok=True)
+    if args.zip:
+        logger.info(f'Packaging and zipping {len(grouped)} files...')
+    else:
+        logger.info(f'Packaging {len(grouped)} files...')
+
+
     for item in grouped:
-        zipPhotosInList(item)
+        if args.zip:
+            zipPhotosInList(item)
+        else:
+            filePhotosInList(item)
+
+def filePhotosInList(filenames: list):
+    # first item in the list is the creation timestamp of the first file
+    # which will be used as the filename
+    if args.path[-1] != os.sep:
+        folderPath = args.path + os.sep + 'packaged' + os.sep + str(Path(os.path.basename(filenames[0]) ).with_suffix(''))
+    else:
+        folderPath = args.path + 'packaged' + os.sep + str(Path(os.path.basename(filenames[0])).with_suffix(''))
+    logger.debug(f'Creating {folderPath}')
+    Path(folderPath).mkdir(parents=True, exist_ok=True)
+    for filename in filenames:
+        shutil.copy2(filename, folderPath)
+    
+    # with zipfile.ZipFile(folderPath, "w", zipfile.ZIP_DEFLATED) as zf:
+    #     for filename in filenames:
+    #         logger.debug(f'\tInserting file {filename}')
+    #         zf.write(filename, arcname=os.path.basename(filename))
+    return 0
 
 def zipPhotosInList(filenames: list):
     # first item in the list is the creation timestamp of the first file
